@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Vinted Tracker</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg2: #1a1d27;
+    --bg3: #242736;
+    --accent: #09c17a;
+    --accent2: #06a368;
+    --red: #e05555;
+    --yellow: #f5c842;
+    --text: #f0f2f7;
+    --text2: #8b90a7;
+    --border: #2e3248;
+    --radius: 14px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; min-height: 100dvh; overflow-x: hidden; }
+
+  /* TABS */
+  #app { display: flex; flex-direction: column; height: 100dvh; }
+  .page { display: none; flex: 1; overflow-y: auto; padding: 16px 16px calc(80px + var(--safe-bottom)) 16px; }
+  .page.active { display: block; }
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg2); border-top: 1px solid var(--border); display: flex; padding-bottom: var(--safe-bottom); z-index: 100; }
+  .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 0 8px; font-size: 10px; color: var(--text2); background: none; border: none; cursor: pointer; transition: color .2s; }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn svg { width: 22px; height: 22px; }
+
+  /* HEADER */
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-top: 8px; }
+  .page-title { font-size: 22px; font-weight: 700; letter-spacing: -.4px; }
+  .page-subtitle { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+  /* STAT CARDS */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+  .stat-card.full { grid-column: 1/-1; }
+  .stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .stat-val { font-size: 24px; font-weight: 700; }
+  .stat-val.green { color: var(--accent); }
+  .stat-val.red { color: var(--red); }
+  .stat-val.yellow { color: var(--yellow); }
+  .stat-sub { font-size: 11px; color: var(--text2); margin-top: 3px; }
+
+  /* CARDS */
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
+  .card-inner { padding: 14px; }
+  .card-img { width: 100%; height: 180px; object-fit: cover; background: var(--bg3); display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 13px; cursor: pointer; position: relative; }
+  .card-img img { width: 100%; height: 100%; object-fit: cover; }
+  .card-img-placeholder { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .card-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .card-name { font-size: 15px; font-weight: 600; flex: 1; }
+  .badge { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+  .badge-lotto { background: #2a1f6b; color: #a48fff; border: 1px solid #4a3db8; }
+  .badge-articolo { background: #0d2e22; color: var(--accent); border: 1px solid var(--accent2); }
+  .badge-venduto { background: #1a2e0d; color: #7edd4e; border: 1px solid #4db82e; }
+  .badge-invendita { background: #2e200d; color: var(--yellow); border: 1px solid #b88d0a; }
+  .price-row { display: flex; gap: 10px; margin-top: 8px; }
+  .price-box { flex: 1; background: var(--bg3); border-radius: 8px; padding: 8px 10px; }
+  .price-box-label { font-size: 10px; color: var(--text2); margin-bottom: 2px; }
+  .price-box-val { font-size: 15px; font-weight: 700; }
+  .price-box-val.green { color: var(--accent); }
+  .price-box-val.red { color: var(--red); }
+  .profit-row { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+  .profit-label { font-size: 12px; color: var(--text2); }
+  .profit-val { font-size: 16px; font-weight: 700; }
+  .card-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { padding: 9px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: opacity .15s; flex: 1; text-align: center; }
+  .btn:active { opacity: .7; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); flex: 0; padding: 9px 12px; }
+
+  /* LOTTO ITEMS */
+  .lotto-items { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .lotto-item { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .lotto-item:last-child { border-bottom: none; }
+  .lotto-item-thumb { width: 48px; height: 48px; border-radius: 8px; background: var(--bg3); flex-shrink: 0; overflow: hidden; }
+  .lotto-item-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .lotto-item-info { flex: 1; min-width: 0; }
+  .lotto-item-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lotto-item-prices { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .lotto-add-btn { background: var(--bg3); border: 1px dashed var(--border); border-radius: 10px; padding: 10px; text-align: center; color: var(--text2); font-size: 13px; cursor: pointer; margin-top: 8px; }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200; display: none; align-items: flex-end; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--bg2); border-radius: 20px 20px 0 0; width: 100%; max-height: 92dvh; overflow-y: auto; padding: 20px 20px calc(20px + var(--safe-bottom)); }
+  .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 18px; }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 18px; }
+
+  /* FORM */
+  .field { margin-bottom: 14px; }
+  .field label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px; }
+  .field input, .field select, .field textarea { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-size: 15px; font-family: inherit; outline: none; transition: border-color .2s; }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field select option { background: var(--bg3); }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; }
+  .photo-upload { width: 100%; height: 140px; background: var(--bg3); border: 2px dashed var(--border); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; color: var(--text2); font-size: 13px; position: relative; overflow: hidden; }
+  .photo-upload img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .photo-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .type-toggle { display: flex; gap: 8px; }
+  .type-btn { flex: 1; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 600; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); cursor: pointer; text-align: center; transition: all .2s; }
+  .type-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  /* CALENDAR */
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .cal-month { font-size: 18px; font-weight: 700; }
+  .cal-arrow { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text); font-size: 18px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 16px; }
+  .cal-day-label { text-align: center; font-size: 10px; color: var(--text2); padding: 4px 0; text-transform: uppercase; }
+  .cal-day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; font-size: 12px; cursor: pointer; position: relative; }
+  .cal-day.today { background: var(--accent); color: #000; font-weight: 700; }
+  .cal-day.has-sales::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); position: absolute; bottom: 3px; }
+  .cal-day.today.has-sales::after { background: #000; }
+  .cal-day.other-month { color: var(--text2); opacity: .4; }
+  .cal-day.selected { background: var(--bg3); border: 1px solid var(--accent); }
+  .cal-sales-list { margin-top: 4px; }
+  .cal-sale-item { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .cal-sale-name { font-size: 14px; font-weight: 600; }
+  .cal-sale-profit { font-size: 14px; font-weight: 700; }
+  .cal-sale-profit.green { color: var(--accent); }
+
+  /* STATS PAGE */
+  .month-summary { background: linear-gradient(135deg, #0d2e22, #162840); border: 1px solid var(--accent2); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; }
+  .month-summary-title { font-size: 13px; color: var(--accent); margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .month-summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .ms-item { text-align: center; }
+  .ms-val { font-size: 18px; font-weight: 700; }
+  .ms-label { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 60px 20px; color: var(--text2); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; }
+
+  /* FAB */
+  .fab { position: fixed; bottom: calc(70px + var(--safe-bottom) + 16px); right: 16px; width: 52px; height: 52px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(9,193,122,.4); cursor: pointer; z-index: 90; border: none; font-size: 24px; color: #000; transition: transform .15s; }
+  .fab:active { transform: scale(.92); }
+
+  .section-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; margin-top: 4px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME PAGE -->
+  <div id="page-home" class="page active">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Vinted Tracker</div>
+        <div class="page-subtitle" id="home-subtitle">Caricamento...</div>
+      </div>
+    </div>
+    <div class="stat-grid" id="home-stats"></div>
+    <div class="section-title">Recenti</div>
+    <div id="home-list"></div>
+  </div>
+
+  <!-- ARTICOLI PAGE -->
+  <div id="page-articoli" class="page">
+    <div class="page-header">
+      <div class="page-title">Articoli & Lotti</div>
+    </div>
+    <div id="articoli-list"></div>
+  </div>
+
+  <!-- CALENDARIO PAGE -->
+  <div id="page-cal" class="page">
+    <div class="page-header">
+      <div class="page-title">Calendario</div>
+    </div>
+    <div class="cal-nav">
+      <div class="cal-arrow" id="cal-prev">‹</div>
+      <div class="cal-month" id="cal-month-label"></div>
+      <div class="cal-arrow" id="cal-next">›</div>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div class="month-summary" id="cal-month-summary"></div>
+    <div class="section-title" id="cal-day-label">Seleziona un giorno</div>
+    <div id="cal-sales-list"></div>
+  </div>
+
+  <!-- STATISTICHE PAGE -->
+  <div id="page-stats" class="page">
+    <div class="page-header">
+      <div class="page-title">Statistiche</div>
+    </div>
+    <div id="stats-content"></div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-page="home">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      Home
+    </button>
+    <button class="nav-btn" data-page="articoli">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Articoli
+    </button>
+    <button class="nav-btn" data-page="cal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Calendario
+    </button>
+    <button class="nav-btn" data-page="stats">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Stats
+    </button>
+  </nav>
+</div>
+
+<!-- FAB -->
+<button class="fab" id="fab-add">＋</button>
+
+<!-- MODAL NUOVO ARTICOLO/LOTTO -->
+<div class="modal-overlay" id="modal-new">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-title">Nuovo Articolo</div>
+
+    <div class="field">
+      <label>Tipo</label>
+      <div class="type-toggle">
+        <div class="type-btn active" data-type="articolo">📦 Articolo</div>
+        <div class="type-btn" data-type="lotto">🗃️ Lotto</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Foto</label>
+      <div class="photo-upload" id="photo-upload-main">
+        <input type="file" accept="image/*" capture="environment" id="photo-input-main">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>Scatta o carica foto</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Nome / Descrizione</label>
+      <input type="text" id="field-nome" placeholder="es. Scarpe Nike Air Max 90">
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Prezzo acquisto (€)</label>
+        <input type="number" id="field-acquisto" placeholder="0.00" step="0.01" min="0">
+      </div>
+      <div class="field" id="field-vendita-wrap">
+        <label>Prezzo vendita (€)</label>
+        <input type="number" id="field-vendita" placeholder="0.00" step="0.01" min="0">
+      </div>
+    </div>
+
+    <div class="field" id="field-stato-wrap">
+      <label>Stato</label>
+      <select id="field-stato">
+        <option value="in_vendita">In vendita</option>
+        <option value="venduto">Venduto</option>
+      </select>
+    </div>
+
+    <div class="field" id="field-data-wrap" style="display:none">
+      <label>Data vendita</label>
+      <input type="date" id="field-data">
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn btn-outline" id="btn-cancel-new">Annulla</button>
+      <button class="btn btn-primary" id="btn-save-new">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AGGIUNGI ITEM A LOTTO -->
+<div class="modal-overlay" id="modal-lotto-item">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Aggiungi articolo al lotto</div>
+
+    <div class="field">
+      <label>Foto articolo</label>
+      <div class="photo-upload" id="photo-upload-item">
+        <input type="file" accept="image/*" capture="environment" id="photo-input-item">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>Foto singolo articolo</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Descrizione</label>
+      <input type="text" id="li-nome" placeholder="es. Maglione blu XL">
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Prezzo vendita (€)</label>
+        <input type="number" id="li-vendita" placeholder="0.00" step="0.01" min="0">
+      </div>
+      <div class="field">
+        <label>Stato</label>
+        <select id="li-stato">
+          <option value="in_vendita">In vendita</option>
+          <option value="venduto">Venduto</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field" id="li-data-wrap" style="display:none">
+      <label>Data vendita</label>
+      <input type="date" id="li-data">
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn btn-outline" id="btn-cancel-li">Annulla</button>
+      <button class="btn btn-primary" id="btn-save-li">Aggiungi</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SEGNA VENDUTO (articolo singolo) -->
+<div class="modal-overlay" id="modal-vendi">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Segna come venduto</div>
+    <div class="field">
+      <label>Prezzo vendita (€)</label>
+      <input type="number" id="vendi-prezzo" placeholder="0.00" step="0.01" min="0">
+    </div>
+    <div class="field">
+      <label>Data vendita</label>
+      <input type="date" id="vendi-data">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn btn-outline" id="btn-cancel-vendi">Annulla</button>
+      <button class="btn btn-primary" id="btn-save-vendi">Conferma</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- STORAGE ----
+function load() { try { return JSON.parse(localStorage.getItem('vt_data') || '[]'); } catch { return []; } }
+function save(d) { localStorage.setItem('vt_data', JSON.stringify(d)); }
+
+let data = load();
+let currentType = 'articolo';
+let editingId = null;
+let lottoItemTarget = null; // id lotto a cui aggiungere item
+let vendiTarget = null;
+let currentPage = 'home';
+let calYear, calMonth, calSelectedDay;
+
+const today = new Date();
+calYear = today.getFullYear();
+calMonth = today.getMonth();
+
+// ---- UTILS ----
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function fmt(n) { return n !== undefined && n !== null && n !== '' ? '€' + parseFloat(n).toFixed(2) : '—'; }
+function profit(item) {
+  if (item.tipo === 'lotto') {
+    const totalVendita = (item.items || []).reduce((s, i) => s + (i.stato === 'venduto' ? parseFloat(i.vendita || 0) : 0), 0);
+    return totalVendita - parseFloat(item.acquisto || 0);
+  }
+  if (item.stato !== 'venduto') return null;
+  return parseFloat(item.vendita || 0) - parseFloat(item.acquisto || 0);
+}
+function profitColor(p) { return p === null ? '' : p >= 0 ? 'green' : 'red'; }
+function monthName(m, y) {
+  return new Date(y, m, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+}
+
+// ---- NAV ----
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const page = btn.dataset.page;
+    document.getElementById('page-' + page).classList.add('active');
+    currentPage = page;
+    if (page === 'home') renderHome();
+    if (page === 'articoli') renderArticoli();
+    if (page === 'cal') renderCal();
+    if (page === 'stats') renderStats();
+  });
+});
+
+// ---- PHOTO HELPERS ----
+function bindPhoto(uploadEl, inputEl, cb) {
+  inputEl.addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      let existing = uploadEl.querySelector('img');
+      if (!existing) { existing = document.createElement('img'); uploadEl.appendChild(existing); }
+      existing.src = e.target.result;
+      uploadEl.querySelector('svg') && (uploadEl.querySelector('svg').style.display = 'none');
+      uploadEl.querySelector('span') && (uploadEl.querySelector('span').style.display = 'none');
+      cb(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+let newPhotoData = null;
+let liPhotoData = null;
+
+bindPhoto(
+  document.getElementById('photo-upload-main'),
+  document.getElementById('photo-input-main'),
+  d => { newPhotoData = d; }
+);
+bindPhoto(
+  document.getElementById('photo-upload-item'),
+  document.getElementById('photo-input-item'),
+  d => { liPhotoData = d; }
+);
+
+// ---- MODAL NEW ----
+function resetNewModal() {
+  newPhotoData = null;
+  document.getElementById('field-nome').value = '';
+  document.getElementById('field-acquisto').value = '';
+  document.getElementById('field-vendita').value = '';
+  document.getElementById('field-stato').value = 'in_vendita';
+  document.getElementById('field-data').value = '';
+  document.getElementById('field-data-wrap').style.display = 'none';
+  const pu = document.getElementById('photo-upload-main');
+  const img = pu.querySelector('img');
+  if (img) img.remove();
+  const svg = pu.querySelector('svg'); if (svg) svg.style.display = '';
+  const sp = pu.querySelector('span'); if (sp) sp.style.display = '';
+  document.getElementById('photo-input-main').value = '';
+  setType('articolo');
+}
+
+function setType(t) {
+  currentType = t;
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === t));
+  document.getElementById('field-vendita-wrap').style.display = t === 'lotto' ? 'none' : '';
+  document.getElementById('field-stato-wrap').style.display = t === 'lotto' ? 'none' : '';
+}
+
+document.querySelectorAll('.type-btn').forEach(b => b.addEventListener('click', () => setType(b.dataset.type)));
+
+document.getElementById('field-stato').addEventListener('change', function() {
+  document.getElementById('field-data-wrap').style.display = this.value === 'venduto' ? '' : 'none';
+});
+
+document.getElementById('fab-add').addEventListener('click', () => {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Nuovo Articolo';
+  resetNewModal();
+  document.getElementById('modal-new').classList.add('open');
+});
+document.getElementById('btn-cancel-new').addEventListener('click', () => {
+  document.getElementById('modal-new').classList.remove('open');
+});
+document.getElementById('modal-new').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+document.getElementById('btn-save-new').addEventListener('click', () => {
+  const nome = document.getElementById('field-nome').value.trim();
+  const acquisto = parseFloat(document.getElementById('field-acquisto').value) || 0;
+  const vendita = parseFloat(document.getElementById('field-vendita').value) || 0;
+  const stato = document.getElementById('field-stato').value;
+  const dataV = document.getElementById('field-data').value;
+  if (!nome) { alert('Inserisci un nome'); return; }
+
+  if (editingId) {
+    const idx = data.findIndex(d => d.id === editingId);
+    if (idx !== -1) {
+      data[idx] = { ...data[idx], nome, acquisto, vendita, stato, dataVendita: stato === 'venduto' ? dataV : null, foto: newPhotoData || data[idx].foto };
+    }
+  } else {
+    const item = { id: uid(), tipo: currentType, nome, acquisto, foto: newPhotoData, createdAt: new Date().toISOString() };
+    if (currentType === 'articolo') { item.vendita = vendita; item.stato = stato; item.dataVendita = stato === 'venduto' ? dataV : null; }
+    if (currentType === 'lotto') { item.items = []; }
+    data.unshift(item);
+  }
+  save(data);
+  document.getElementById('modal-new').classList.remove('open');
+  if (currentPage === 'articoli') renderArticoli();
+  if (currentPage === 'home') renderHome();
+});
+
+// ---- MODAL LOTTO ITEM ----
+function resetLiModal() {
+  liPhotoData = null;
+  document.getElementById('li-nome').value = '';
+  document.getElementById('li-vendita').value = '';
+  document.getElementById('li-stato').value = 'in_vendita';
+  document.getElementById('li-data').value = '';
+  document.getElementById('li-data-wrap').style.display = 'none';
+  const pu = document.getElementById('photo-upload-item');
+  const img = pu.querySelector('img'); if (img) img.remove();
+  const svg = pu.querySelector('svg'); if (svg) svg.style.display = '';
+  const sp = pu.querySelector('span'); if (sp) sp.style.display = '';
+  document.getElementById('photo-input-item').value = '';
+}
+
+document.getElementById('li-stato').addEventListener('change', function() {
+  document.getElementById('li-data-wrap').style.display = this.value === 'venduto' ? '' : 'none';
+});
+
+document.getElementById('btn-cancel-li').addEventListener('click', () => {
+  document.getElementById('modal-lotto-item').classList.remove('open');
+});
+document.getElementById('modal-lotto-item').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+document.getElementById('btn-save-li').addEventListener('click', () => {
+  const nome = document.getElementById('li-nome').value.trim();
+  const vendita = parseFloat(document.getElementById('li-vendita').value) || 0;
+  const stato = document.getElementById('li-stato').value;
+  const dataV = document.getElementById('li-data').value;
+  if (!nome) { alert('Inserisci un nome'); return; }
+  const lotto = data.find(d => d.id === lottoItemTarget);
+  if (!lotto) return;
+  lotto.items.push({ id: uid(), nome, vendita, stato, dataVendita: stato === 'venduto' ? dataV : null, foto: liPhotoData });
+  save(data);
+  document.getElementById('modal-lotto-item').classList.remove('open');
+  renderArticoli();
+});
+
+// ---- MODAL VENDI ----
+document.getElementById('btn-cancel-vendi').addEventListener('click', () => { document.getElementById('modal-vendi').classList.remove('open'); });
+document.getElementById('modal-vendi').addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
+document.getElementById('btn-save-vendi').addEventListener('click', () => {
+  const prezzo = parseFloat(document.getElementById('vendi-prezzo').value) || 0;
+  const dataV = document.getElementById('vendi-data').value;
+  const item = data.find(d => d.id === vendiTarget);
+  if (item) { item.vendita = prezzo; item.stato = 'venduto'; item.dataVendita = dataV || new Date().toISOString().slice(0,10); }
+  save(data);
+  document.getElementById('modal-vendi').classList.remove('open');
+  renderArticoli();
+  renderHome();
+});
+
+// ---- CARD BUILDER ----
+function buildCard(item) {
+  const div = document.createElement('div');
+  div.className = 'card';
+
+  // Image
+  const imgDiv = document.createElement('div');
+  imgDiv.className = 'card-img';
+  if (item.foto) {
+    const img = document.createElement('img'); img.src = item.foto; imgDiv.appendChild(img);
+  } else {
+    imgDiv.innerHTML = `<div class="card-img-placeholder"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Nessuna foto</span></div>`;
+  }
+  div.appendChild(imgDiv);
+
+  const inner = document.createElement('div');
+  inner.className = 'card-inner';
+
+  // Row: name + badge
+  const row = document.createElement('div');
+  row.className = 'card-row';
+  const name = document.createElement('div');
+  name.className = 'card-name';
+  name.textContent = item.nome;
+  row.appendChild(name);
+
+  const badge = document.createElement('span');
+  badge.className = 'badge';
+  if (item.tipo === 'lotto') { badge.classList.add('badge-lotto'); badge.textContent = '🗃️ Lotto'; }
+  else if (item.stato === 'venduto') { badge.classList.add('badge-venduto'); badge.textContent = '✓ Venduto'; }
+  else { badge.classList.add('badge-invendita'); badge.textContent = '⏳ In vendita'; }
+  row.appendChild(badge);
+  inner.appendChild(row);
+
+  // Prices
+  const priceRow = document.createElement('div');
+  priceRow.className = 'price-row';
+
+  const aq = document.createElement('div'); aq.className = 'price-box';
+  aq.innerHTML = `<div class="price-box-label">Acquisto</div><div class="price-box-val red">${fmt(item.acquisto)}</div>`;
+  priceRow.appendChild(aq);
+
+  if (item.tipo === 'lotto') {
+    const totVen = (item.items || []).reduce((s, i) => s + (i.stato === 'venduto' ? parseFloat(i.vendita || 0) : 0), 0);
+    const totPoten = (item.items || []).reduce((s, i) => s + parseFloat(i.vendita || 0), 0);
+    const vb = document.createElement('div'); vb.className = 'price-box';
+    vb.innerHTML = `<div class="price-box-label">Venduto</div><div class="price-box-val green">${fmt(totVen)}</div>`;
+    priceRow.appendChild(vb);
+    const pb = document.createElement('div'); pb.className = 'price-box';
+    pb.innerHTML = `<div class="price-box-label">Totale pot.</div><div class="price-box-val">${fmt(totPoten)}</div>`;
+    priceRow.appendChild(pb);
+  } else {
+    const vb = document.createElement('div'); vb.className = 'price-box';
+    vb.innerHTML = `<div class="price-box-label">Vendita</div><div class="price-box-val green">${fmt(item.vendita)}</div>`;
+    priceRow.appendChild(vb);
+  }
+  inner.appendChild(priceRow);
+
+  // Profit
+  const p = profit(item);
+  if (p !== null) {
+    const pr = document.createElement('div');
+    pr.className = 'profit-row';
+    pr.innerHTML = `<span class="profit-label">Guadagno:</span><span class="profit-val ${profitColor(p)}">${p >= 0 ? '+' : ''}${fmt(p)}</span>`;
+    inner.appendChild(pr);
+  }
+
+  // Actions
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+
+  if (item.tipo === 'lotto') {
+    const btnAdd = document.createElement('button');
+    btnAdd.className = 'btn btn-primary';
+    btnAdd.textContent = '+ Articolo';
+    btnAdd.addEventListener('click', () => {
+      lottoItemTarget = item.id;
+      resetLiModal();
+      document.getElementById('modal-lotto-item').classList.add('open');
+    });
+    actions.appendChild(btnAdd);
+  } else if (item.stato !== 'venduto') {
+    const btnVendi = document.createElement('button');
+    btnVendi.className = 'btn btn-primary';
+    btnVendi.textContent = '✓ Vendi';
+    btnVendi.addEventListener('click', () => {
+      vendiTarget = item.id;
+      document.getElementById('vendi-prezzo').value = item.vendita || '';
+      document.getElementById('vendi-data').value = new Date().toISOString().slice(0,10);
+      document.getElementById('modal-vendi').classList.add('open');
+    });
+    actions.appendChild(btnVendi);
+  }
+
+  const btnEdit = document.createElement('button');
+  btnEdit.className = 'btn btn-outline';
+  btnEdit.textContent = '✎';
+  btnEdit.addEventListener('click', () => {
+    editingId = item.id;
+    document.getElementById('modal-title').textContent = 'Modifica';
+    resetNewModal();
+    setType(item.tipo);
+    document.getElementById('field-nome').value = item.nome;
+    document.getElementById('field-acquisto').value = item.acquisto;
+    document.getElementById('field-vendita').value = item.vendita || '';
+    document.getElementById('field-stato').value = item.stato || 'in_vendita';
+    if (item.dataVendita) { document.getElementById('field-data').value = item.dataVendita; document.getElementById('field-data-wrap').style.display = ''; }
+    if (item.foto) {
+      newPhotoData = item.foto;
+      const pu = document.getElementById('photo-upload-main');
+      let img = pu.querySelector('img'); if (!img) { img = document.createElement('img'); pu.appendChild(img); }
+      img.src = item.foto;
+      const svg = pu.querySelector('svg'); if (svg) svg.style.display = 'none';
+      const sp = pu.querySelector('span'); if (sp) sp.style.display = 'none';
+    }
+    document.getElementById('modal-new').classList.add('open');
+  });
+  actions.appendChild(btnEdit);
+
+  const btnDel = document.createElement('button');
+  btnDel.className = 'btn btn-danger';
+  btnDel.textContent = '🗑';
+  btnDel.addEventListener('click', () => {
+    if (confirm('Eliminare?')) {
+      data = data.filter(d => d.id !== item.id);
+      save(data);
+      renderArticoli();
+      renderHome();
+    }
+  });
+  actions.appendChild(btnDel);
+  inner.appendChild(actions);
+
+  // Lotto items
+  if (item.tipo === 'lotto' && item.items && item.items.length > 0) {
+    const li = document.createElement('div');
+    li.className = 'lotto-items';
+    item.items.forEach(i => {
+      const row = document.createElement('div');
+      row.className = 'lotto-item';
+      const thumb = document.createElement('div');
+      thumb.className = 'lotto-item-thumb';
+      if (i.foto) { const img = document.createElement('img'); img.src = i.foto; thumb.appendChild(img); }
+      else thumb.style.background = 'var(--bg3)';
+      row.appendChild(thumb);
+      const info = document.createElement('div');
+      info.className = 'lotto-item-info';
+      info.innerHTML = `<div class="lotto-item-name">${i.nome}</div><div class="lotto-item-prices">${i.stato === 'venduto' ? '✓ Venduto' : '⏳ In vendita'} · ${fmt(i.vendita)}</div>`;
+      row.appendChild(info);
+      if (i.stato !== 'venduto') {
+        const vb = document.createElement('button');
+        vb.className = 'btn btn-primary'; vb.style.flex = '0'; vb.style.padding = '6px 10px'; vb.style.fontSize = '11px';
+        vb.textContent = 'Vendi';
+        vb.addEventListener('click', () => {
+          vendiTarget = '__li__' + item.id + '__' + i.id;
+          document.getElementById('vendi-prezzo').value = i.vendita || '';
+          document.getElementById('vendi-data').value = new Date().toISOString().slice(0,10);
+          document.getElementById('modal-vendi').classList.add('open');
+        });
+        row.appendChild(vb);
+      }
+      li.appendChild(row);
+    });
+    inner.appendChild(li);
+  }
+
+  div.appendChild(inner);
+  return div;
+}
+
+// Override vendi for lotto items
+const origVendi = document.getElementById('btn-save-vendi').onclick;
+document.getElementById('btn-save-vendi').addEventListener('click', () => {
+  if (vendiTarget && vendiTarget.startsWith('__li__')) {
+    const [, , lottoId, itemId] = vendiTarget.split('__');
+    const lotto = data.find(d => d.id === lottoId);
+    if (lotto) {
+      const i = lotto.items.find(x => x.id === itemId);
+      if (i) {
+        i.stato = 'venduto';
+        i.vendita = parseFloat(document.getElementById('vendi-prezzo').value) || i.vendita;
+        i.dataVendita = document.getElementById('vendi-data').value || new Date().toISOString().slice(0,10);
+      }
+    }
+    save(data);
+    document.getElementById('modal-vendi').classList.remove('open');
+    renderArticoli();
+    renderHome();
+  }
+});
+
+// ---- RENDER HOME ----
+function renderHome() {
+  data = load();
+  const now = new Date();
+  const thisMonth = data.filter(item => {
+    if (item.tipo === 'articolo' && item.stato === 'venduto' && item.dataVendita) {
+      const d = new Date(item.dataVendita);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+    return false;
+  });
+  const lottoSales = data.filter(item => item.tipo === 'lotto').flatMap(l => (l.items || []).filter(i => {
+    if (i.stato === 'venduto' && i.dataVendita) {
+      const d = new Date(i.dataVendita);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+    return false;
+  }));
+
+  const speseMese = thisMonth.reduce((s, i) => s + parseFloat(i.acquisto || 0), 0);
+  const incassoMese = thisMonth.reduce((s, i) => s + parseFloat(i.vendita || 0), 0) + lottoSales.reduce((s, i) => s + parseFloat(i.vendita || 0), 0);
+  const guadagnoMese = incassoMese - speseMese - data.filter(d => d.tipo === 'lotto').reduce((s, l) => {
+    const hasVenditaMese = (l.items || []).some(i => { if (!i.dataVendita) return false; const d = new Date(i.dataVendita); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
+    return hasVenditaMese ? s + parseFloat(l.acquisto || 0) : s;
+  }, 0);
+
+  const totArticoli = data.length;
+  const inVendita = data.filter(d => d.tipo === 'articolo' && d.stato !== 'venduto').length + data.filter(d => d.tipo === 'lotto').reduce((s, l) => s + (l.items || []).filter(i => i.stato !== 'venduto').length, 0);
+
+  document.getElementById('home-subtitle').textContent = monthName(now.getMonth(), now.getFullYear());
+  document.getElementById('home-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Incasso mese</div><div class="stat-val green">${fmt(incassoMese)}</div></div>
+    <div class="stat-card"><div class="stat-label">Spese mese</div><div class="stat-val red">${fmt(speseMese)}</div></div>
+    <div class="stat-card full"><div class="stat-label">Guadagno netto</div><div class="stat-val ${guadagnoMese >= 0 ? 'green' : 'red'}">${guadagnoMese >= 0 ? '+' : ''}${fmt(guadagnoMese)}</div><div class="stat-sub">${totArticoli} articoli totali · ${inVendita} in vendita</div></div>
+  `;
+
+  const list = document.getElementById('home-list');
+  list.innerHTML = '';
+  const recent = [...data].slice(0, 5);
+  if (!recent.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📦</div><div class="empty-title">Nessun articolo</div><div class="empty-sub">Premi + per aggiungere il primo</div></div>'; return; }
+  recent.forEach(item => list.appendChild(buildCard(item)));
+}
+
+// ---- RENDER ARTICOLI ----
+function renderArticoli() {
+  data = load();
+  const list = document.getElementById('articoli-list');
+  list.innerHTML = '';
+  if (!data.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">🗃️</div><div class="empty-title">Nessun articolo</div><div class="empty-sub">Premi + per aggiungere</div></div>'; return; }
+  data.forEach(item => list.appendChild(buildCard(item)));
+}
+
+// ---- CALENDAR ----
+document.getElementById('cal-prev').addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCal(); });
+document.getElementById('cal-next').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCal(); });
+
+function getSalesForDay(y, m, d) {
+  const result = [];
+  data.forEach(item => {
+    if (item.tipo === 'articolo' && item.stato === 'venduto' && item.dataVendita) {
+      const dd = new Date(item.dataVendita);
+      if (dd.getFullYear() === y && dd.getMonth() === m && dd.getDate() === d) result.push({ nome: item.nome, profit: profit(item) });
+    }
+    if (item.tipo === 'lotto') {
+      (item.items || []).forEach(i => {
+        if (i.stato === 'venduto' && i.dataVendita) {
+          const dd = new Date(i.dataVendita);
+          if (dd.getFullYear() === y && dd.getMonth() === m && dd.getDate() === d) result.push({ nome: i.nome + ' (lotto: ' + item.nome + ')', profit: parseFloat(i.vendita || 0) });
+        }
+      });
+    }
+  });
+  return result;
+}
+
+function renderCal() {
+  data = load();
+  document.getElementById('cal-month-label').textContent = monthName(calMonth, calYear);
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+  const firstDayMon = (firstDay + 6) % 7; // Mon=0
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  ['L','M','M','G','V','S','D'].forEach(l => {
+    const d = document.createElement('div'); d.className = 'cal-day-label'; d.textContent = l; grid.appendChild(d);
+  });
+
+  for (let i = 0; i < firstDayMon; i++) {
+    const d = document.createElement('div'); d.className = 'cal-day other-month'; grid.appendChild(d);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = document.createElement('div'); d.className = 'cal-day';
+    const dayDate = new Date(calYear, calMonth, day);
+    const t = new Date(); t.setHours(0,0,0,0);
+    dayDate.setHours(0,0,0,0);
+    if (dayDate.getTime() === t.getTime()) d.classList.add('today');
+    const sales = getSalesForDay(calYear, calMonth, day);
+    if (sales.length) d.classList.add('has-sales');
+    if (calSelectedDay === day) d.classList.add('selected');
+    d.textContent = day;
+    d.addEventListener('click', () => {
+      calSelectedDay = day;
+      renderCal();
+    });
+    grid.appendChild(d);
+  }
+
+  // Month summary
+  let totSpese = 0, totIncasso = 0;
+  data.forEach(item => {
+    if (item.tipo === 'articolo' && item.stato === 'venduto' && item.dataVendita) {
+      const dd = new Date(item.dataVendita);
+      if (dd.getMonth() === calMonth && dd.getFullYear() === calYear) {
+        totIncasso += parseFloat(item.vendita || 0);
+        totSpese += parseFloat(item.acquisto || 0);
+      }
+    }
+    if (item.tipo === 'lotto') {
+      let lottoContribuisce = false;
+      (item.items || []).forEach(i => {
+        if (i.stato === 'venduto' && i.dataVendita) {
+          const dd = new Date(i.dataVendita);
+          if (dd.getMonth() === calMonth && dd.getFullYear() === calYear) {
+            totIncasso += parseFloat(i.vendita || 0);
+            lottoContribuisce = true;
+          }
+        }
+      });
+      if (lottoContribuisce) totSpese += parseFloat(item.acquisto || 0);
+    }
+  });
+  const netto = totIncasso - totSpese;
+
+  document.getElementById('cal-month-summary').innerHTML = `
+    <div class="month-summary-title">📊 ${monthName(calMonth, calYear)}</div>
+    <div class="month-summary-grid">
+      <div class="ms-item"><div class="ms-val" style="color:var(--red)">${fmt(totSpese)}</div><div class="ms-label">Spese</div></div>
+      <div class="ms-item"><div class="ms-val" style="color:var(--accent)">${fmt(totIncasso)}</div><div class="ms-label">Incasso</div></div>
+      <div class="ms-item"><div class="ms-val" style="color:${netto>=0?'var(--accent)':'var(--red)'}">${netto>=0?'+':''}${fmt(netto)}</div><div class="ms-label">Netto</div></div>
+    </div>
+  `;
+
+  if (calSelectedDay) {
+    const sales = getSalesForDay(calYear, calMonth, calSelectedDay);
+    document.getElementById('cal-day-label').textContent = `${calSelectedDay} ${new Date(calYear, calMonth, calSelectedDay).toLocaleDateString('it-IT', { month: 'long' })}`;
+    const sl = document.getElementById('cal-sales-list');
+    sl.innerHTML = '';
+    if (!sales.length) {
+      sl.innerHTML = '<div style="color:var(--text2);font-size:13px;text-align:center;padding:16px">Nessuna vendita</div>';
+    } else {
+      sales.forEach(s => {
+        const div = document.createElement('div'); div.className = 'cal-sale-item';
+        div.innerHTML = `<div class="cal-sale-name">${s.nome}</div><div class="cal-sale-profit ${s.profit >= 0 ? 'green' : ''}">${s.profit !== null ? (s.profit >= 0 ? '+' : '') + fmt(s.profit) : fmt(s.profit)}</div>`;
+        sl.appendChild(div);
+      });
+    }
+  }
+}
+
+// ---- RENDER STATS ----
+function renderStats() {
+  data = load();
+  const months = {};
+  data.forEach(item => {
+    if (item.tipo === 'articolo' && item.stato === 'venduto' && item.dataVendita) {
+      const d = new Date(item.dataVendita);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (!months[key]) months[key] = { incasso: 0, spese: 0, count: 0 };
+      months[key].incasso += parseFloat(item.vendita || 0);
+      months[key].spese += parseFloat(item.acquisto || 0);
+      months[key].count++;
+    }
+    if (item.tipo === 'lotto') {
+      const lottoMonths = new Set();
+      (item.items || []).forEach(i => {
+        if (i.stato === 'venduto' && i.dataVendita) {
+          const d = new Date(i.dataVendita);
+          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+          if (!months[key]) months[key] = { incasso: 0, spese: 0, count: 0 };
+          months[key].incasso += parseFloat(i.vendita || 0);
+          months[key].count++;
+          lottoMonths.add(key);
+        }
+      });
+      lottoMonths.forEach(k => { months[k].spese += parseFloat(item.acquisto || 0); });
+    }
+  });
+
+  const el = document.getElementById('stats-content');
+  el.innerHTML = '';
+
+  // Overall
+  const totIncasso = Object.values(months).reduce((s, m) => s + m.incasso, 0);
+  const totSpese = Object.values(months).reduce((s, m) => s + m.spese, 0);
+  const totNetto = totIncasso - totSpese;
+  const totVendite = Object.values(months).reduce((s, m) => s + m.count, 0);
+
+  const overall = document.createElement('div');
+  overall.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card full" style="background:linear-gradient(135deg,#0d2e22,#162840);border-color:var(--accent2)">
+        <div class="stat-label">Guadagno totale</div>
+        <div class="stat-val ${totNetto>=0?'green':'red'}">${totNetto>=0?'+':''}${fmt(totNetto)}</div>
+        <div class="stat-sub">${totVendite} vendite · ${fmt(totSpese)} spese · ${fmt(totIncasso)} incassati</div>
+      </div>
+    </div>
+  `;
+  el.appendChild(overall);
+
+  // By month
+  const sortedMonths = Object.keys(months).sort().reverse();
+  if (!sortedMonths.length) {
+    el.innerHTML += '<div class="empty"><div class="empty-icon">📈</div><div class="empty-title">Nessun dato</div><div class="empty-sub">Le statistiche appariranno dopo le prime vendite</div></div>';
+    return;
+  }
+
+  const secTitle = document.createElement('div');
+  secTitle.className = 'section-title';
+  secTitle.style.marginTop = '8px';
+  secTitle.textContent = 'Per mese';
+  el.appendChild(secTitle);
+
+  sortedMonths.forEach(key => {
+    const m = months[key];
+    const [y, mo] = key.split('-');
+    const netto = m.incasso - m.spese;
+    const card = document.createElement('div');
+    card.className = 'month-summary';
+    card.innerHTML = `
+      <div class="month-summary-title">📅 ${monthName(parseInt(mo)-1, parseInt(y))}</div>
+      <div class="month-summary-grid">
+        <div class="ms-item"><div class="ms-val" style="color:var(--red)">${fmt(m.spese)}</div><div class="ms-label">Spese</div></div>
+        <div class="ms-item"><div class="ms-val" style="color:var(--accent)">${fmt(m.incasso)}</div><div class="ms-label">Incasso</div></div>
+        <div class="ms-item"><div class="ms-val" style="color:${netto>=0?'var(--accent)':'var(--red)'}">${netto>=0?'+':''}${fmt(netto)}</div><div class="ms-label">Netto</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-top:8px">${m.count} vendite</div>
+    `;
+    el.appendChild(card);
+  });
+}
+
+// ---- INIT ----
+renderHome();
+renderCal();
+</script>
+</body>
+</html>
